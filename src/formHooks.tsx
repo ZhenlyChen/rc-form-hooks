@@ -84,10 +84,14 @@ function useForm<V = any>(
     fieldsValidated: {
       [N in keyof V]?: true;
     };
+    fieldsError: {
+      [N in keyof V]?: true;
+    };
     currentField?: keyof V;
   }>({
     fieldsTouched: {},
-    fieldsValidated: {}
+    fieldsValidated: {},
+    fieldsError: {}
   });
 
   const fieldsOptions = useRef<
@@ -104,12 +108,15 @@ function useForm<V = any>(
   }, [values]);
   useEffect(() => {
     const {
-      current: { fieldsTouched: fieldsChanged, currentField }
+      current: { fieldsTouched: fieldsChanged, fieldsError, currentField }
     } = cacheData;
-    if (currentField === undefined || !fieldsChanged[currentField]) {
+    if (
+      currentField === undefined ||
+      !fieldsChanged[currentField] ||
+      fieldsError[currentField]
+    ) {
       return;
     }
-
     validate(fieldsOptions.current, values, [currentField])
       .then(() => {
         setErrors(errors => {
@@ -161,6 +168,7 @@ function useForm<V = any>(
             const { current } = cacheData;
             current.currentField = n;
             current.fieldsTouched[n] = true;
+            current.fieldsError[n] = undefined;
             if (createOptions.onValuesChange) {
               createOptions.onValuesChange(
                 // eslint-disable-next-line @typescript-eslint/no-object-literal-type-assertion
@@ -346,14 +354,6 @@ function useForm<V = any>(
   ]);
 
   const setFields = useCallback(fields => {
-    setValues(oldValues => {
-      const values = { ...oldValues };
-      for (const name in fields) {
-        const { value } = fields[name];
-        values[name] = value;
-      }
-      return values;
-    });
     setErrors(oldErrors => {
       const errors = { ...oldErrors };
       for (const name in fields) {
@@ -362,8 +362,18 @@ function useForm<V = any>(
           message,
           field: name
         }));
+        const { current } = cacheData;
+        current.fieldsError[name] = true;
       }
       return errors;
+    });
+    setValues(oldValues => {
+      const values = { ...oldValues };
+      for (const name in fields) {
+        const { value } = fields[name];
+        values[name] = value;
+      }
+      return values;
     });
   }, []);
 
